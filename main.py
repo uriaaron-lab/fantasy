@@ -39,8 +39,8 @@ def save_memory(new_memory_data):
 def analyze_with_ai(league_data, memory_data):
     genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
     
-    # שימוש במודל המתקדם והעדכני של ג'מיני (מתאים לעיבוד טקסטים ארוכים)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    # שימוש במודל המתקדם והעדכני של ג'מיני 
+    model = genai.GenerativeModel('gemini-2.5-flash')
     
     prompt = f"""
     אתה מומחה פאנטזי פוטבול (NFL) ברמה עולמית, ואתה מנהל עבורי את הקבוצה לעונת 2026.
