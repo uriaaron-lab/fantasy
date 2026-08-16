@@ -3,7 +3,8 @@ import json
 import requests
 import google.generativeai as genai
 
-SLEEPER_USERNAME = "uria87" # הכנס את שם המשתמש שלך כאן
+# שם המשתמש שלך מעודכן כאן:
+SLEEPER_USERNAME = "uria87"
 MEMORY_FILE = "bot_memory.json"
 
 def send_discord_message(message):
@@ -39,8 +40,8 @@ def save_memory(new_memory_data):
 def analyze_with_ai(league_data, memory_data):
     genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
     
-    # שימוש במודל המתקדם והעדכני של ג'מיני 
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    # שימוש במודל התקין והעדכני ביותר 
+    model = genai.GenerativeModel('gemini-2.0-flash')
     
     prompt = f"""
     אתה מומחה פאנטזי פוטבול (NFL) ברמה עולמית, ואתה מנהל עבורי את הקבוצה לעונת 2026.
@@ -78,10 +79,10 @@ def get_sleeper_data():
         
     league_id = leagues_res.json()[0].get("league_id")
     
-    # משיכת נתוני רוסטרים של כל הליגה (כדי למצוא הזדמנויות לטריידים)
+    # משיכת נתוני רוסטרים של כל הליגה
     rosters_res = requests.get(f"https://api.sleeper.app/v1/league/{league_id}/rosters")
     
-    # משיכת שחקנים טרנדיים (לחיפוש בוויבר ווייר)
+    # משיכת שחקנים טרנדיים
     trending_res = requests.get("https://api.sleeper.app/v1/players/nfl/trending/add?lookback_hours=24&limit=5")
     
     return {
