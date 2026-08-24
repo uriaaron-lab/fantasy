@@ -41,7 +41,6 @@ def analyze_with_ai(league_data, memory_data):
     if not api_key:
         raise ValueError("GEMINI_API_KEY environment variable is missing!")
         
-    # בניית פרומפט בטוח לחלוטין ללא f-string בעייתי
     raw_prompt = """
     אתה מנהל קבוצת פאנטזי פוטבול (NFL) אסטרטגי, חכם ואנליטי ברמה העולמית. המטרה שלך היא לא רק לתת המלצות שטחיות, אלא להשתפר וללמוד לבד מפעם לפעם.
     
@@ -65,7 +64,8 @@ def analyze_with_ai(league_data, memory_data):
         memory_json=json.dumps(memory_data, ensure_ascii=False)
     )
     
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    # רשימת מודלים לניסיונות אוטומטיים (מבטיח שלא תהיה נפילה על 404)
+    models_to_try = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
     headers = {"Content-Type": "application/json"}
     payload = {
         "contents": [{
@@ -73,20 +73,31 @@ def analyze_with_ai(league_data, memory_data):
         }]
     }
     
-    try:
-        print("Sending request directly to Gemini API...")
-        response = requests.post(url, headers=headers, json=payload)
-        print(f"Gemini API Response Status: {response.status_code}")
-        
-        if response.status_code != 200:
-            print(f"Gemini API Error Body: {response.text}")
-            raise Exception(f"Gemini API failed with status {response.status_code}: {response.text}")
+    response = None
+    for model_name in models_to_try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+        print(f"Trying Gemini model: {model_name}...")
+        try:
+            res = requests.post(url, headers=headers, json=payload)
+            print(f"Model {model_name} response status: {res.status_code}")
+            if res.status_code == 200:
+                response = res
+                print(f"Successfully connected using model: {model_name}")
+                break
+            else:
+                print(f"Model {model_name} returned error: {res.text}")
+        except Exception as e:
+            print(f"Exception trying model {model_name}: {e}")
             
+    if response is None or response.status_code != 200:
+        raise Exception("CRITICAL: All Gemini models failed or returned 404.")
+        
+    try:
         res_data = response.json()
         text = res_data["candidates"][0]["content"]["parts"][0]["text"]
         return text
     except Exception as e:
-        print(f"CRITICAL ERROR - שגיאה בתקשורת מול Gemini API: {str(e)}")
+        print(f"Error parsing Gemini response JSON: {response.text}")
         raise e
 
 def get_sleeper_data():
