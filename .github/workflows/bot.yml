@@ -28,7 +28,7 @@ jobs:
       - name: Run Fantasy Bot Script
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: python3 main.py
 
       - name: Save Bot Memory and Push
