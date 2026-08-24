@@ -38,9 +38,9 @@ def save_memory(new_memory_data):
         json.dump(new_memory_data, f, ensure_ascii=False, indent=4)
 
 def analyze_with_ai(league_data, memory_data):
-    api_key = os.getenv("GROQ_API_KEY")
+    api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        raise ValueError("GROQ_API_KEY environment variable is missing!")
+        raise ValueError("OPENAI_API_KEY environment variable is missing!")
         
     prompt = f"""
     אתה מנהל קבוצת פאנטזי פוטבול (NFL) אסטרטגי, חכם ואנליטי ברמה העולמית.
@@ -54,16 +54,12 @@ def analyze_with_ai(league_data, memory_data):
     המשימה שלך: נתח את הנתונים, תן המלצות Waiver Wire, אסטרטגיית טריידים ולו"ז, וכתוב בסוף פסקה תחת הכותרת "UPDATE_MEMORY" עם מה שצריך לזכור לשבוע הבא. ענה בעברית עם אימוג'ים.
     """
     
-    # שימוש בספרייה הרשמית של OpenAI שמכוונת לשרתים של Groq - מונע לחלוטין 404
-    client = OpenAI(
-        api_key=api_key,
-        base_url="https://api.groq.com/openai/v1"
-    )
+    client = OpenAI(api_key=api_key)
     
-    print("Sending request to Groq via official OpenAI client...")
+    print("Sending request to OpenAI (gpt-4o-mini)...")
     try:
         response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="gpt-4o-mini",
             messages=[
                 {"role": "user", "content": prompt}
             ],
@@ -71,7 +67,7 @@ def analyze_with_ai(league_data, memory_data):
         )
         return response.choices[0].message.content
     except Exception as e:
-        print(f"CRITICAL ERROR - שגיאה בתקשורת מול Groq: {str(e)}")
+        print(f"CRITICAL ERROR - שגיאה בתקשורת מול OpenAI: {str(e)}")
         raise e
 
 def get_sleeper_data():
@@ -119,7 +115,7 @@ if __name__ == "__main__":
     ai_response = analyze_with_ai(league_data, memory)
     
     parts = ai_response.split("UPDATE_MEMORY")
-    discord_message = parts[0].strip()
+    discord_message = parts.0.strip() if len(parts) > 0 else ai_response
     new_memory_text = parts[1].strip() if len(parts) > 1 else "לא נוסף זיכרון חדש."
     
     save_memory({"past_lessons": new_memory_text})
