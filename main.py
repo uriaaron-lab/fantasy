@@ -41,14 +41,14 @@ def analyze_with_ai(league_data, memory_data):
     if not api_key:
         raise ValueError("GROQ_API_KEY environment variable is missing!")
         
-    prompt = f"""
+    raw_prompt = """
     אתה מנהל קבוצת פאנטזי פוטבול (NFL) אסטרטגי, חכם ואנליטי ברמה העולמית. המטרה שלך היא לא רק לתת המלצות שטחיות, אלא להשתפר וללמוד לבד מפעם לפעם.
     
     נתוני הליגה, הסגלים, והטרנדים מהפלטפורמה (Sleeper):
-    {json.dumps(league_data, ensure_ascii=False)}
+    {league_json}
     
     הזיכרון ההיסטורי והתובנות שהפקת בשבועות קודמים (למידה עצמית ושיפור מתמשך):
-    {json.dumps(memory_data, ensure_ascii=False)}
+    {memory_json}
     
     הנחיות חובה לניתוח שלך:
     1. אסטרטגיה לפי לו"ז (Schedules): אל תסתכל רק על השחקן עצמו אלא גם על הלו"ז שלו ושל הקבוצה שלי (Bye Weeks, משחקים קשים מול הגנות חזקות בשלבי ההכרעה, וכד'). תמליץ על הרמות (Waiver Wire) או טריידים תוך התחשבות בלו"ז העתידי לטווח קצר וארוך.
@@ -59,34 +59,56 @@ def analyze_with_ai(league_data, memory_data):
     ענה בעברית מקצועית, פשוטה, ממוקדת, עם אימוג'ים מתאימים.
     """
     
+    prompt = raw_prompt.format(
+        league_json=json.dumps(league_data, ensure_ascii=False),
+        memory_json=json.dumps(memory_data, ensure_ascii=False)
+    )
+    
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
     }
-    payload = {
-        "model": "llama-3.3-70b-versatile",
-        "messages": [
-            {"role": "system", "content": "אתה מומחה פאנטזי פוטבול אנליטי."},
-            {"role": "user", "content": prompt}
-        ],
-        "temperature": 0.7
-    }
     
-    try:
-        print("Sending request to Groq API...")
-        response = requests.post(url, headers=headers, json=payload)
-        print(f"Groq API Response Status: {response.status_code}")
-        
-        if response.status_code != 200:
-            print(f"Groq API Error Body: {response.text}")
-            raise Exception(f"Groq API failed with status {response.status_code}: {response.text}")
+    # רשימת מודלים ניתנת לניסיון אוטומטי עד שאחד מהם עובד חלק
+    models_to_try = [
+        "llama-3.1-70b-versatile",
+        "llama3-70b-8192",
+        "llama-3.1-8b-instant"
+    ]
+    
+    response = None
+    for model_name in models_to_try:
+        payload = {
+            "model": model_name,
+            "messages": [
+                {"role": "system", "content": "אתה מומחה פאנטזי פוטבול אנליטי."},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.7
+        }
+        print(f"Trying Groq model: {model_name}...")
+        try:
+            res = requests.post(url, headers=headers, json=payload)
+            print(f"Model {model_name} status code: {res.status_code}")
+            if res.status_code == 200:
+                response = res
+                print(f"Successfully connected using Groq model: {model_name}")
+                break
+            else:
+                print(f"Model {model_name} error: {res.text}")
+        except Exception as e:
+            print(f"Exception with model {model_name}: {e}")
             
+    if response is None or response.status_code != 200:
+        raise Exception("CRITICAL: All Groq models failed or returned errors.")
+        
+    try:
         res_data = response.json()
         text = res_data["choices"][0]["message"]["content"]
         return text
     except Exception as e:
-        print(f"CRITICAL ERROR - שגיאה בתקשורת מול Groq API: {str(e)}")
+        print(f"Error parsing Groq response JSON: {response.text}")
         raise e
 
 def get_sleeper_data():
