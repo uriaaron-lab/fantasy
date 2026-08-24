@@ -72,28 +72,45 @@ def analyze_with_ai(league_data, memory_data):
         raise e
 
 def get_sleeper_data():
+    print(f"Fetching Sleeper user: {SLEEPER_USERNAME}...")
     user_res = requests.get(f"https://api.sleeper.app/v1/user/{SLEEPER_USERNAME}")
+    print(f"User API status code: {user_res.status_code}")
+    
     if user_res.status_code != 200:
-        print(f"Error fetching user: {user_res.status_code}")
+        print(f"Failed to fetch user from Sleeper. Response: {user_res.text}")
         return None
-    user_id = user_res.json().get("user_id")
+        
+    user_data = user_res.json()
+    if not user_data or "user_id" not in user_data:
+        print(f"User data is invalid: {user_data}")
+        return None
+        
+    user_id = user_data.get("user_id")
+    print(f"Found User ID: {user_id}")
     
-    # ניסיון שליפה לשנת 2026, ואם ריק - ניסיון לשנת 2025 או שליפה כללית
-    leagues_res = requests.get(f"https://api.sleeper.app/v1/user/{user_id}/leagues/nfl/2026")
-    leagues = leagues_res.json() if leagues_res.status_code == 200 else []
+    # נסיון שליפה לשנת 2026, ואז 2025
+    leagues = []
+    for year in ["2026", "2025"]:
+        print(f"Trying to fetch leagues for year {year}...")
+        leagues_res = requests.get(f"https://api.sleeper.app/v1/user/{user_id}/leagues/nfl/{year}")
+        print(f"Leagues {year} status code: {leagues_res.status_code}")
+        if leagues_res.status_code == 200:
+            data = leagues_res.json()
+            if data:
+                leagues = data
+                print(f"Successfully found {len(leagues)} leagues for {year}.")
+                break
     
     if not leagues:
-        leagues_res = requests.get(f"https://api.sleeper.app/v1/user/{user_id}/leagues/nfl/2025")
-        leagues = leagues_res.json() if leagues_res.status_code == 200 else []
-
-    if not leagues:
-        print("No leagues found for 2026 or 2025.")
+        print("No leagues found for 2026 or 2025 in Sleeper API.")
         return None
         
     if len(leagues) <= LEAGUE_INDEX:
         league_id = leagues[0].get("league_id")
     else:
         league_id = leagues[LEAGUE_INDEX].get("league_id")
+        
+    print(f"Using League ID: {league_id}")
     
     rosters_res = requests.get(f"https://api.sleeper.app/v1/league/{league_id}/rosters")
     trending_res = requests.get("https://api.sleeper.app/v1/players/nfl/trending/add?lookback_hours=24&limit=5")
@@ -106,11 +123,11 @@ def get_sleeper_data():
     }
 
 if __name__ == "__main__":
-    print(f"Fetching Sleeper data for League Index {LEAGUE_INDEX}...")
+    print(f"Starting bot for League Index {LEAGUE_INDEX}...")
     league_data = get_sleeper_data()
     
     if not league_data:
-        print("Failed to get league data from Sleeper API.")
+        print("CRITICAL: Failed to get league data from Sleeper API.")
         exit(1)
         
     print("Loading memory...")
