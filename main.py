@@ -3,23 +3,24 @@ import json
 import requests
 import google.generativeai as genai
 
-# שם המשתמש שלך מוגדר כאן:
+# הגדרות כלליות
 SLEEPER_USERNAME = "uria87"
-MEMORY_FILE = "bot_memory.json"
+# אם תרצה ליצור בוט לליגה השנייה, פשוט צור קובץ נפרד ושנה כאן ל-1
+LEAGUE_INDEX = 0  
+MEMORY_FILE = f"bot_memory_league_{LEAGUE_INDEX}.json"
 
 def send_discord_message(message):
     webhook_url = os.getenv("DISCORD_WEBHOOK_URL")
     if not webhook_url:
         return
 
-    # חיתוך ההודעה במקרה שהיא ארוכה מדי לדיסקורד (מגבלת 4096 תווים ל-Embed)
     description = message[:4090] + "..." if len(message) > 4096 else message
 
     data = {
-        "content": "🧠 **עדכון מסוכן ה-AI שלך:**",
+        "content": "🧠 **עדכון סוכן ה-AI החכם לפאנטזי:**",
         "embeds": [
             {
-                "title": f"ניתוח פאנטזי אסטרטגי - עונת 2026",
+                "title": f"ניתוח אסטרטגי מתקדם - ליגה {LEAGUE_INDEX + 1}",
                 "description": description,
                 "color": 3447003
             }
@@ -31,58 +32,65 @@ def load_memory():
     if os.path.exists(MEMORY_FILE):
         with open(MEMORY_FILE, 'r', encoding='utf-8') as f:
             return json.load(f)
-    return {"past_lessons": "זהו השבוע הראשון, אין עדיין תובנות עבר.", "previous_recommendations": []}
+    return {"past_lessons": "זהו השבוע הראשון, אין עדיין תובנות עבר או הפקת לקחים קודמת.", "previous_recommendations": []}
 
 def save_memory(new_memory_data):
     with open(MEMORY_FILE, 'w', encoding='utf-8') as f:
         json.dump(new_memory_data, f, ensure_ascii=False, indent=4)
 
 def analyze_with_ai(league_data, memory_data):
-    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise ValueError("GEMINI_API_KEY environment variable is missing!")
+        
+    genai.configure(api_key=api_key)
     
-    # שדרוג למודל הפעיל והעדכני של גוגל 
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    # שימוש במודל יציב ומהיר
+    model = genai.GenerativeModel('gemini-1.5-flash')
     
     prompt = f"""
-    אתה מומחה פאנטזי פוטבול (NFL) ברמה עולמית, ואתה מנהל עבורי את הקבוצה לעונת 2026.
+    אתה מנהל קבוצת פאנטזי פוטבול (NFL) אסטרטגי, חכם ואנליטי ברמה העולמית. המטרה שלך היא לא רק לתת המלצות שטחיות, אלא להשתפר וללמוד לבד מפעם לפעם.
     
-    נתוני הליגה והסגלים מהפלטפורמה (Sleeper):
+    נתוני הליגה, הסגלים, והטרנדים מהפלטפורמה (Sleeper):
     {json.dumps(league_data, ensure_ascii=False)}
     
-    זיכרון ותובנות משבועות קודמים שכתבת לעצמך (כדי שתלמד מטעויות והצלחות):
+    הזיכרון ההיסטורי והתובנות שהפקת בשבועות קודמים (למידה עצמית ושיפור מתמשך):
     {json.dumps(memory_data, ensure_ascii=False)}
     
-    המשימה שלך:
-    נתח את הנתונים לעומק. אני רוצה שתיצור דוח שמכיל את החלקים הבאים:
-    1. תמונת מצב של הקבוצה שלי: מאצ'-אפים קרובים ונקודות חולשה.
-    2. המלצות שוק פנויים (Waiver Wire): מי חם עכשיו ושווה להרים.
-    3. אסטרטגיית טריידים: זהה קבוצות אחרות בליגה שיש להן חולשות ספציפיות, והצע לי טרייד ספציפי (תן שחקן X, קבל שחקן Y) שיהיה הוגן ויאושר על ידם, אבל ייתן לי יתרון.
-    4. עדכון זיכרון: בסוף התשובה שלך, כתוב פסקה אחת תחת הכותרת "UPDATE_MEMORY" ובה תסכם מה לזכור לשבוע הבא (למשל: איזה טרייד הצענו, על איזה שחקן אנחנו עוקבים, איזה אסטרטגיה עבדה). 
+    הנחיות חובה לניתוח שלך:
+    1. **אסטרטגיה לפי לו"ז (Schedules):** אל תסתכל רק על השחקן עצמו אלא גם על הלו"ז שלו ושל הקבוצה שלי (Bye Weeks, משחקים קשים מול הגנות חזקות בשלבי ההכרעה, וכד'). תמליץ על הרמות (Waiver Wire) או טריידים תוך התחשבות בלו"ז העתידי לטווח קצר וארוך.
+    2. **איזון עמדות ובניית סגל:** תדאג שתמיד תהיה לי קבוצה מאוזנת (גיבויים נכונים לפציעות, עומק לסрьון ארוך). בהתחשב במבנה הדראפט ובמיקומי הבחירה, תנתח מי שחקנים עשויים להישאר לבחירה הבאה ותכנן את האסטרטגיה בהתאם.
+    3. **סינון רלוונטיות מידע:** תתייחס אך ורק לנתונים ולחדשות עדכניות שרלוונטיות למצבים קורים כעת בשטח (פציעות אמיתיות, מעמדים של שחקנים בקבוצות אמיתיות השבוע), ותתעלם فرעשי nền לא רלוונטיים.
+    4. **עדכון זיכרון עצמי (UPDATE_MEMORY):** בסוף התשובה שלך, כתוב פסקה מדויקת תחת הכותרת "UPDATE_MEMORY" שבה אתה מסכם מה למדת מהשבוע הנוכחי, אילו החלטות הצליחו ואילו טעויות צריך לתקן לשבוע הבא כדי שהסוכן יהיה חכם יותר בפעם הבאה.
     
-    ענה בעברית מקצועית, פשוטה וברורה. עשה שימוש באימוג'ים כדי להקל על הקריאה.
+    ענה בעברית מקצועית, פשוטה, ממוקדת, עם אימוג'ים מתאימים.
     """
     
-    response = model.generate_content(prompt)
-    return response.text
+    try:
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        print(f"CRITICAL ERROR - שגיאה בתקשורת מול Gemini API: {str(e)}")
+        raise e
 
 def get_sleeper_data():
-    # משיכת מזהה המשתמש
     user_res = requests.get(f"https://api.sleeper.app/v1/user/{SLEEPER_USERNAME}")
     if user_res.status_code != 200:
         return None
     user_id = user_res.json().get("user_id")
     
-    # משיכת הליגות
+    # שליפת הליגות לעונת 2026
     leagues_res = requests.get(f"https://api.sleeper.app/v1/user/{user_id}/leagues/nfl/2026")
     if leagues_res.status_code != 200 or not leagues_res.json():
         return None
         
-    league_id = leagues_res.json()[0].get("league_id")
+    leagues = leagues_res.json()
+    if len(leagues) <= LEAGUE_INDEX:
+        league_id = leagues[0].get("league_id") # ברירת מחדל אם אין אינדקס
+    else:
+        league_id = leagues[LEAGUE_INDEX].get("league_id")
     
-    # משיכת נתוני רוסטרים של כל הליגה (כדי למצוא הזדמנויות לטריידים)
     rosters_res = requests.get(f"https://api.sleeper.app/v1/league/{league_id}/rosters")
-    
-    # משיכת שחקנים טרנדיים (לחיפוש בוויבר ווייר)
     trending_res = requests.get("https://api.sleeper.app/v1/players/nfl/trending/add?lookback_hours=24&limit=5")
     
     return {
@@ -93,7 +101,7 @@ def get_sleeper_data():
     }
 
 if __name__ == "__main__":
-    print("Fetching Sleeper data...")
+    print(f"Fetching Sleeper data for League Index {LEAGUE_INDEX}...")
     league_data = get_sleeper_data()
     
     if not league_data:
@@ -106,13 +114,10 @@ if __name__ == "__main__":
     print("Analyzing with Gemini AI...")
     ai_response = analyze_with_ai(league_data, memory)
     
-    # הפרדת ההמלצות מתוך הטקסט של עדכון הזיכרון
     parts = ai_response.split("UPDATE_MEMORY")
     discord_message = parts[0].strip()
-    
     new_memory_text = parts[1].strip() if len(parts) > 1 else "לא נוסף זיכרון חדש."
     
-    # עדכון ושמירת הזיכרון
     new_memory = {
         "past_lessons": new_memory_text
     }
