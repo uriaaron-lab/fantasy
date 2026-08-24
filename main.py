@@ -37,18 +37,18 @@ def save_memory(new_memory_data):
         json.dump(new_memory_data, f, ensure_ascii=False, indent=4)
 
 def analyze_with_ai(league_data, memory_data):
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
-        raise ValueError("GEMINI_API_KEY environment variable is missing!")
+        raise ValueError("GROQ_API_KEY environment variable is missing!")
         
-    raw_prompt = """
+    prompt = f"""
     אתה מנהל קבוצת פאנטזי פוטבול (NFL) אסטרטגי, חכם ואנליטי ברמה העולמית. המטרה שלך היא לא רק לתת המלצות שטחיות, אלא להשתפר וללמוד לבד מפעם לפעם.
     
     נתוני הליגה, הסגלים, והטרנדים מהפלטפורמה (Sleeper):
-    {league_json}
+    {json.dumps(league_data, ensure_ascii=False)}
     
     הזיכרון ההיסטורי והתובנות שהפקת בשבועות קודמים (למידה עצמית ושיפור מתמשך):
-    {memory_json}
+    {json.dumps(memory_data, ensure_ascii=False)}
     
     הנחיות חובה לניתוח שלך:
     1. אסטרטגיה לפי לו"ז (Schedules): אל תסתכל רק על השחקן עצמו אלא גם על הלו"ז שלו ושל הקבוצה שלי (Bye Weeks, משחקים קשים מול הגנות חזקות בשלבי ההכרעה, וכד'). תמליץ על הרמות (Waiver Wire) או טריידים תוך התחשבות בלו"ז העתידי לטווח קצר וארוך.
@@ -59,45 +59,34 @@ def analyze_with_ai(league_data, memory_data):
     ענה בעברית מקצועית, פשוטה, ממוקדת, עם אימוג'ים מתאימים.
     """
     
-    prompt = raw_prompt.format(
-        league_json=json.dumps(league_data, ensure_ascii=False),
-        memory_json=json.dumps(memory_data, ensure_ascii=False)
-    )
-    
-    # רשימת מודלים לניסיונות אוטומטיים (מבטיח שלא תהיה נפילה על 404)
-    models_to_try = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
-    headers = {"Content-Type": "application/json"}
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
     payload = {
-        "contents": [{
-            "parts": [{"text": prompt}]
-        }]
+        "model": "llama-3.3-70b-versatile",
+        "messages": [
+            {"role": "system", "content": "אתה מומחה פאנטזי פוטבול אנליטי."},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.7
     }
     
-    response = None
-    for model_name in models_to_try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
-        print(f"Trying Gemini model: {model_name}...")
-        try:
-            res = requests.post(url, headers=headers, json=payload)
-            print(f"Model {model_name} response status: {res.status_code}")
-            if res.status_code == 200:
-                response = res
-                print(f"Successfully connected using model: {model_name}")
-                break
-            else:
-                print(f"Model {model_name} returned error: {res.text}")
-        except Exception as e:
-            print(f"Exception trying model {model_name}: {e}")
-            
-    if response is None or response.status_code != 200:
-        raise Exception("CRITICAL: All Gemini models failed or returned 404.")
-        
     try:
+        print("Sending request to Groq API...")
+        response = requests.post(url, headers=headers, json=payload)
+        print(f"Groq API Response Status: {response.status_code}")
+        
+        if response.status_code != 200:
+            print(f"Groq API Error Body: {response.text}")
+            raise Exception(f"Groq API failed with status {response.status_code}: {response.text}")
+            
         res_data = response.json()
-        text = res_data["candidates"][0]["content"]["parts"][0]["text"]
+        text = res_data["choices"][0]["message"]["content"]
         return text
     except Exception as e:
-        print(f"Error parsing Gemini response JSON: {response.text}")
+        print(f"CRITICAL ERROR - שגיאה בתקשורת מול Groq API: {str(e)}")
         raise e
 
 def get_sleeper_data():
@@ -161,7 +150,7 @@ if __name__ == "__main__":
     print("Loading memory...")
     memory = load_memory()
     
-    print("Analyzing with Gemini AI...")
+    print("Analyzing with Groq AI...")
     ai_response = analyze_with_ai(league_data, memory)
     
     parts = ai_response.split("UPDATE_MEMORY")
