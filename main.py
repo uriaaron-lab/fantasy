@@ -115,7 +115,7 @@ if __name__ == "__main__":
     ai_response = analyze_with_ai(league_data, memory)
     
     parts = ai_response.split("UPDATE_MEMORY")
-    discord_message = parts.0.strip() if len(parts) > 0 else ai_response
+    discord_message = parts[0].strip() if len(parts) > 0 else ai_response
     new_memory_text = parts[1].strip() if len(parts) > 1 else "לא נוסף זיכרון חדש."
     
     save_memory({"past_lessons": new_memory_text})
