@@ -5,7 +5,6 @@ import google.generativeai as genai
 
 # הגדרות כלליות
 SLEEPER_USERNAME = "uria87"
-# אם תרצה ליצור בוט לליגה השנייה, פשוט צור קובץ נפרד ושנה כאן ל-1
 LEAGUE_INDEX = 0  
 MEMORY_FILE = f"bot_memory_league_{LEAGUE_INDEX}.json"
 
@@ -45,7 +44,6 @@ def analyze_with_ai(league_data, memory_data):
         
     genai.configure(api_key=api_key)
     
-    # שימוש במודל יציב ומהיר
     model = genai.GenerativeModel('gemini-1.5-flash')
     
     prompt = f"""
@@ -59,8 +57,8 @@ def analyze_with_ai(league_data, memory_data):
     
     הנחיות חובה לניתוח שלך:
     1. **אסטרטגיה לפי לו"ז (Schedules):** אל תסתכל רק על השחקן עצמו אלא גם על הלו"ז שלו ושל הקבוצה שלי (Bye Weeks, משחקים קשים מול הגנות חזקות בשלבי ההכרעה, וכד'). תמליץ על הרמות (Waiver Wire) או טריידים תוך התחשבות בלו"ז העתידי לטווח קצר וארוך.
-    2. **איזון עמדות ובניית סגל:** תדאג שתמיד תהיה לי קבוצה מאוזנת (גיבויים נכונים לפציעות, עומק לסрьון ארוך). בהתחשב במבנה הדראפט ובמיקומי הבחירה, תנתח מי שחקנים עשויים להישאר לבחירה הבאה ותכנן את האסטרטגיה בהתאם.
-    3. **סינון רלוונטיות מידע:** תתייחס אך ורק לנתונים ולחדשות עדכניות שרלוונטיות למצבים קורים כעת בשטח (פציעות אמיתיות, מעמדים של שחקנים בקבוצות אמיתיות השבוע), ותתעלם فرעשי nền לא רלוונטיים.
+    2. **איזון עמדות ובניית סגל:** תדאג שתמיד תהיה לי קבוצה מאוזנת (גיבויים נכונים לפציעות, עומק לעונה ארוכה). בהתחשב במבנה הדראפט ובמיקומי הבחירה, תנתח מי שחקנים עשויים להישאר לבחירה הבאה ותכנן את האסטרטגיה בהתאם.
+    3. **סינון רלוונטיות מידע:** תתייחס אך ורק לנתונים ולחדשות עדכניות שרלוונטיות למצבים קורים כעת בשטח (פציעות אמיתיות, מעמדים של שחקנים בקבוצות אמיתיות השבוע), ותתעלם מרעשי רקע לא רלוונטיים.
     4. **עדכון זיכרון עצמי (UPDATE_MEMORY):** בסוף התשובה שלך, כתוב פסקה מדויקת תחת הכותרת "UPDATE_MEMORY" שבה אתה מסכם מה למדת מהשבוע הנוכחי, אילו החלטות הצליחו ואילו טעויות צריך לתקן לשבוע הבא כדי שהסוכן יהיה חכם יותר בפעם הבאה.
     
     ענה בעברית מקצועית, פשוטה, ממוקדת, עם אימוג'ים מתאימים.
@@ -76,17 +74,24 @@ def analyze_with_ai(league_data, memory_data):
 def get_sleeper_data():
     user_res = requests.get(f"https://api.sleeper.app/v1/user/{SLEEPER_USERNAME}")
     if user_res.status_code != 200:
+        print(f"Error fetching user: {user_res.status_code}")
         return None
     user_id = user_res.json().get("user_id")
     
-    # שליפת הליגות לעונת 2026
+    # ניסיון שליפה לשנת 2026, ואם ריק - ניסיון לשנת 2025 או שליפה כללית
     leagues_res = requests.get(f"https://api.sleeper.app/v1/user/{user_id}/leagues/nfl/2026")
-    if leagues_res.status_code != 200 or not leagues_res.json():
+    leagues = leagues_res.json() if leagues_res.status_code == 200 else []
+    
+    if not leagues:
+        leagues_res = requests.get(f"https://api.sleeper.app/v1/user/{user_id}/leagues/nfl/2025")
+        leagues = leagues_res.json() if leagues_res.status_code == 200 else []
+
+    if not leagues:
+        print("No leagues found for 2026 or 2025.")
         return None
         
-    leagues = leagues_res.json()
     if len(leagues) <= LEAGUE_INDEX:
-        league_id = leagues[0].get("league_id") # ברירת מחדל אם אין אינדקס
+        league_id = leagues[0].get("league_id")
     else:
         league_id = leagues[LEAGUE_INDEX].get("league_id")
     
@@ -105,7 +110,7 @@ if __name__ == "__main__":
     league_data = get_sleeper_data()
     
     if not league_data:
-        print("Failed to get league data.")
+        print("Failed to get league data from Sleeper API.")
         exit(1)
         
     print("Loading memory...")
