@@ -41,115 +41,65 @@ def analyze_with_ai(league_data, memory_data):
     if not api_key:
         raise ValueError("GROQ_API_KEY environment variable is missing!")
         
-    raw_prompt = """
-    אתה מנהל קבוצת פאנטזי פוטבול (NFL) אסטרטגי, חכם ואנליטי ברמה העולמית. המטרה שלך היא לא רק לתת המלצות שטחיות, אלא להשתפר וללמוד לבד מפעם לפעם.
+    prompt = f"""
+    אתה מנהל קבוצת פאנטזי פוטבול (NFL) אסטרטגי, חכם ואנליטי ברמה העולמית.
     
-    נתוני הליגה, הסגלים, והטרנדים מהפלטפורמה (Sleeper):
-    {league_json}
+    נתוני הליגה והסגלים מ-Sleeper:
+    {json.dumps(league_data, ensure_ascii=False)}
     
-    הזיכרון ההיסטורי והתובנות שהפקת בשבועות קודמים (למידה עצמית ושיפור מתמשך):
-    {memory_json}
+    זיכרון ותובנות משבועות קודמים:
+    {json.dumps(memory_data, ensure_ascii=False)}
     
-    הנחיות חובה לניתוח שלך:
-    1. אסטרטגיה לפי לו"ז (Schedules): אל תסתכל רק על השחקן עצמו אלא גם על הלו"ז שלו ושל הקבוצה שלי (Bye Weeks, משחקים קשים מול הגנות חזקות בשלבי ההכרעה, וכד'). תמליץ על הרמות (Waiver Wire) או טריידים תוך התחשבות בלו"ז העתידי לטווח קצר וארוך.
-    2. איזון עמדות ובניית סגל: תדאג שתמיד תהיה לי קבוצה מאוזנת (גיבויים נכונים לפציעות, עומק לעונה ארוכה). בהתחשב במבנה הדראפט ובמיקומי הבחירה, תנתח מי שחקנים עשויים להישאר לבחירה הבאה ותכנן את האסטרטגיה בהתאם.
-    3. סינון רלוונטיות מידע: תתייחס אך ורק לנתונים ולחדשות עדכניות שרלוונטיות למצבים קורים כעת בשטח (פציעות אמיתיות, מעמדים של שחקנים בקבוצות אמיתיות השבוע), ותתעלם מרעשי רקע לא רלוונטיים.
-    4. עדכון זיכרון עצמי (UPDATE_MEMORY): בסוף התשובה שלך, כתוב פסקה מדויקת תחת הכותרת "UPDATE_MEMORY" שבה אתה מסכם מה למדת מהשבוע הנוכחי, אילו החלטות הצליחו ואילו טעויות צריך לתקן לשבוע הבא כדי שהסוכן יהיה חכם יותר בפעם הבאה.
-    
-    ענה בעברית מקצועית, פשוטה, ממוקדת, עם אימוג'ים מתאימים.
+    המשימה שלך: נתח את הנתונים, תן המלצות Waiver Wire, אסטרטגיית טריידים ולו"ז, וכתוב בסוף פסקה תחת הכותרת "UPDATE_MEMORY" עם מה שצריך לזכור לשבוע הבא. ענה בעברית עם אימוג'ים.
     """
-    
-    prompt = raw_prompt.format(
-        league_json=json.dumps(league_data, ensure_ascii=False),
-        memory_json=json.dumps(memory_data, ensure_ascii=False)
-    )
     
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
     }
+    payload = {
+        "model": "llama-3.1-8b-instant",
+        "messages": [
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.7
+    }
     
-    # רשימת מודלים ניתנת לניסיון אוטומטי עד שאחד מהם עובד חלק
-    models_to_try = [
-        "llama-3.1-70b-versatile",
-        "llama3-70b-8192",
-        "llama-3.1-8b-instant"
-    ]
+    print("Sending request to Groq API...")
+    response = requests.post(url, headers=headers, json=payload)
+    print(f"Groq API Response Status: {response.status_code}")
     
-    response = None
-    for model_name in models_to_try:
-        payload = {
-            "model": model_name,
-            "messages": [
-                {"role": "system", "content": "אתה מומחה פאנטזי פוטבול אנליטי."},
-                {"role": "user", "content": prompt}
-            ],
-            "temperature": 0.7
-        }
-        print(f"Trying Groq model: {model_name}...")
-        try:
-            res = requests.post(url, headers=headers, json=payload)
-            print(f"Model {model_name} status code: {res.status_code}")
-            if res.status_code == 200:
-                response = res
-                print(f"Successfully connected using Groq model: {model_name}")
-                break
-            else:
-                print(f"Model {model_name} error: {res.text}")
-        except Exception as e:
-            print(f"Exception with model {model_name}: {e}")
-            
-    if response is None or response.status_code != 200:
-        raise Exception("CRITICAL: All Groq models failed or returned errors.")
+    # אם יש שגיאה, נדפיס אותה במדויק כדי שנוכל לראות מה הבעיה בלי לנחש
+    if response.status_code != 200:
+        print(f"GROQ ERROR DETAILS: {response.text}")
+        raise Exception(f"Groq API failed with status {response.status_code}")
         
-    try:
-        res_data = response.json()
-        text = res_data["choices"][0]["message"]["content"]
-        return text
-    except Exception as e:
-        print(f"Error parsing Groq response JSON: {response.text}")
-        raise e
+    res_data = response.json()
+    return res_data["choices"][0]["message"]["content"]
 
 def get_sleeper_data():
     print(f"Fetching Sleeper user: {SLEEPER_USERNAME}...")
     user_res = requests.get(f"https://api.sleeper.app/v1/user/{SLEEPER_USERNAME}")
-    print(f"User API status code: {user_res.status_code}")
-    
     if user_res.status_code != 200:
-        print(f"Failed to fetch user from Sleeper. Response: {user_res.text}")
+        print(f"Failed to fetch user: {user_res.text}")
         return None
         
     user_data = user_res.json()
-    if not user_data or "user_id" not in user_data:
-        print(f"User data is invalid: {user_data}")
-        return None
-        
     user_id = user_data.get("user_id")
-    print(f"Found User ID: {user_id}")
     
-    leagues = []
-    for year in ["2026", "2025"]:
-        print(f"Trying to fetch leagues for year {year}...")
-        leagues_res = requests.get(f"https://api.sleeper.app/v1/user/{user_id}/leagues/nfl/{year}")
-        print(f"Leagues {year} status code: {leagues_res.status_code}")
-        if leagues_res.status_code == 200:
-            data = leagues_res.json()
-            if data:
-                leagues = data
-                print(f"Successfully found {len(leagues)} leagues for {year}.")
-                break
+    leagues_res = requests.get(f"https://api.sleeper.app/v1/user/{user_id}/leagues/nfl/2026")
+    leagues = leagues_res.json() if leagues_res.status_code == 200 else []
     
     if not leagues:
-        print("No leagues found for 2026 or 2025 in Sleeper API.")
+        leagues_res = requests.get(f"https://api.sleeper.app/v1/user/{user_id}/leagues/nfl/2025")
+        leagues = leagues_res.json() if leagues_res.status_code == 200 else []
+
+    if not leagues:
+        print("No leagues found.")
         return None
         
-    if len(leagues) <= LEAGUE_INDEX:
-        league_id = leagues[0].get("league_id")
-    else:
-        league_id = leagues[LEAGUE_INDEX].get("league_id")
-        
-    print(f"Using League ID: {league_id}")
+    league_id = leagues[LEAGUE_INDEX].get("league_id") if len(leagues) > LEAGUE_INDEX else leagues[0].get("league_id")
     
     rosters_res = requests.get(f"https://api.sleeper.app/v1/league/{league_id}/rosters")
     trending_res = requests.get("https://api.sleeper.app/v1/players/nfl/trending/add?lookback_hours=24&limit=5")
@@ -162,28 +112,20 @@ def get_sleeper_data():
     }
 
 if __name__ == "__main__":
-    print(f"Starting bot for League Index {LEAGUE_INDEX}...")
+    print("Starting bot...")
     league_data = get_sleeper_data()
     
     if not league_data:
-        print("CRITICAL: Failed to get league data from Sleeper API.")
+        print("CRITICAL: Failed to get league data.")
         exit(1)
         
-    print("Loading memory...")
     memory = load_memory()
-    
-    print("Analyzing with Groq AI...")
     ai_response = analyze_with_ai(league_data, memory)
     
     parts = ai_response.split("UPDATE_MEMORY")
     discord_message = parts[0].strip()
     new_memory_text = parts[1].strip() if len(parts) > 1 else "לא נוסף זיכרון חדש."
     
-    new_memory = {
-        "past_lessons": new_memory_text
-    }
-    save_memory(new_memory)
-    
-    print("Sending to Discord...")
+    save_memory({"past_lessons": new_memory_text})
     send_discord_message(discord_message)
     print("Done!")
