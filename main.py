@@ -1,7 +1,6 @@
 import os
 import json
 import requests
-import google.generativeai as genai
 
 # הגדרות כלליות
 SLEEPER_USERNAME = "uria87"
@@ -42,11 +41,6 @@ def analyze_with_ai(league_data, memory_data):
     if not api_key:
         raise ValueError("GEMINI_API_KEY environment variable is missing!")
         
-    genai.configure(api_key=api_key)
-    
-    # שימוש במודל היציב
-    model = genai.GenerativeModel('gemini-1.5-flash')
-    
     prompt = f"""
     אתה מנהל קבוצת פאנטזי פוטבול (NFL) אסטרטגי, חכם ואנליטי ברמה העולמית. המטרה שלך היא לא רק לתת המלצות שטחיות, אלא להשתפר וללמוד לבד מפעם לפעם.
     
@@ -65,9 +59,27 @@ def analyze_with_ai(league_data, memory_data):
     ענה בעברית מקצועית, פשוטה, ממוקדת, עם אימוג'ים מתאימים.
     """
     
+    # פנייה ישירה ל-API של גוגל באמצעות HTTP POST בלי תלות בחבילות פייתון בעייתיות
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "contents": [{
+            "parts": [{"text": prompt}]
+        }]
+    }
+    
     try:
-        response = model.generate_content(prompt)
-        return response.text
+        print("Sending request directly to Gemini API...")
+        response = requests.post(url, headers=headers, json=payload)
+        print(f"Gemini API Response Status: {response.status_code}")
+        
+        if response.status_code != 200:
+            print(f"Gemini API Error Body: {response.text}")
+            raise Exception(f"Gemini API failed with status {response.status_code}: {response.text}")
+            
+        res_data = response.json()
+        text = res_data["candidates"][0]["content"]["parts"][0]["text"]
+        return text
     except Exception as e:
         print(f"CRITICAL ERROR - שגיאה בתקשורת מול Gemini API: {str(e)}")
         raise e
