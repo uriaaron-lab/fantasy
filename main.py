@@ -44,6 +44,7 @@ def analyze_with_ai(league_data, memory_data):
         
     genai.configure(api_key=api_key)
     
+    # שימוש במודל היציב
     model = genai.GenerativeModel('gemini-1.5-flash')
     
     prompt = f"""
@@ -88,7 +89,6 @@ def get_sleeper_data():
     user_id = user_data.get("user_id")
     print(f"Found User ID: {user_id}")
     
-    # נסיון שליפה לשנת 2026, ואז 2025
     leagues = []
     for year in ["2026", "2025"]:
         print(f"Trying to fetch leagues for year {year}...")
