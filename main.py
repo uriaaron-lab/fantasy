@@ -1,6 +1,7 @@
 import os
 import json
 import requests
+from openai import OpenAI
 
 # הגדרות כלליות
 SLEEPER_USERNAME = "uria87"
@@ -53,30 +54,25 @@ def analyze_with_ai(league_data, memory_data):
     המשימה שלך: נתח את הנתונים, תן המלצות Waiver Wire, אסטרטגיית טריידים ולו"ז, וכתוב בסוף פסקה תחת הכותרת "UPDATE_MEMORY" עם מה שצריך לזכור לשבוע הבא. ענה בעברית עם אימוג'ים.
     """
     
-    url = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "model": "llama-3.1-8b-instant",
-        "messages": [
-            {"role": "user", "content": prompt}
-        ],
-        "temperature": 0.7
-    }
+    # שימוש בספרייה הרשמית של OpenAI שמכוונת לשרתים של Groq - מונע לחלוטין 404
+    client = OpenAI(
+        api_key=api_key,
+        base_url="https://api.groq.com/openai/v1"
+    )
     
-    print("Sending request to Groq API...")
-    response = requests.post(url, headers=headers, json=payload)
-    print(f"Groq API Response Status: {response.status_code}")
-    
-    # אם יש שגיאה, נדפיס אותה במדויק כדי שנוכל לראות מה הבעיה בלי לנחש
-    if response.status_code != 200:
-        print(f"GROQ ERROR DETAILS: {response.text}")
-        raise Exception(f"Groq API failed with status {response.status_code}")
-        
-    res_data = response.json()
-    return res_data["choices"][0]["message"]["content"]
+    print("Sending request to Groq via official OpenAI client...")
+    try:
+        response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        print(f"CRITICAL ERROR - שגיאה בתקשורת מול Groq: {str(e)}")
+        raise e
 
 def get_sleeper_data():
     print(f"Fetching Sleeper user: {SLEEPER_USERNAME}...")
